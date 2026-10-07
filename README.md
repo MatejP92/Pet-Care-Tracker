@@ -99,13 +99,23 @@ Do not use DDEV's development or test credentials in a deployment.
 
 ## Continuous integration
 
-The `CI` GitHub Actions workflow runs on pull requests targeting `main` and pushes to `main`. Its independent backend and frontend jobs run the same Composer and npm checks documented above, installing from the committed lockfiles.
+The `CI` GitHub Actions workflow runs on pull requests targeting `dev` or `main` and pushes to either branch. Its independent backend and frontend jobs run the same Composer and npm checks documented above, installing from the committed lockfiles. The `Branch flow` check requires pull requests targeting `main` to originate from this repository's `dev` branch. Changing a pull request's base branch also reruns the workflow.
 
 The backend job uses PHP 8.4, Composer 2, and a disposable MariaDB 11.8 service. Its `db_test` user can access only the test database; a separate empty `db.users` table lets the existing isolation test verify that access is denied. CI generates its own test application key and uses disposable database credentials, with no production secrets required.
 
 Tests default to DDEV's `db` hostname. CI overrides only `DB_HOST` to connect through the service's mapped localhost port; PHPUnit continues to enforce the test database, test username, and MariaDB connection. The frontend job uses Node.js 24 and runs lint, typecheck, and build. Both jobs use read-only repository permissions.
 
-View results in the pull request's checks or the repository's Actions tab. To make passing checks mandatory before merging, configure a branch ruleset requiring `Backend checks` and `Frontend checks`.
+View results in the pull request's checks or the repository's Actions tab. Both `dev` and `main` are protected by active GitHub rulesets requiring a pull request, an up-to-date branch, resolved review conversations, and successful `Branch flow`, `Backend checks`, and `Frontend checks` from GitHub Actions. Direct pushes, force pushes, and branch deletion are blocked, including for administrators. Approval by a second person is not required.
+
+## Branch workflow
+
+`dev` is the default integration branch; `main` holds releases. Start a short `feat/<description>` branch from the latest `dev` and open a pull request targeting `dev`.
+
+Promote tested changes with a `dev` → `main` pull request. Both branches require fresh passing checks. Use a merge commit for promotion; the `main` ruleset allows only this merge method to preserve shared history. Feature pull requests into `dev` may use squash or merge commits.
+
+After promotion, open a `main` → `dev` synchronization pull request and merge it with a merge commit before the next release. Avoid squash merging between these long-lived branches because it breaks their shared ancestry.
+
+These branches do not create deployed environments. A future test environment can follow `dev`, and production can follow `main`, with separate databases, credentials, and deployment configuration.
 
 ## Contributing
 
