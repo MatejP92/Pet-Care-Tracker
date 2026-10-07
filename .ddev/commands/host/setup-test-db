@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+
+## Description: Create the isolated local MariaDB test database and its restricted user
+## Usage: setup-test-db
+## HostCommand: true
+
+set -euo pipefail
+
+ddev mysql --user=root --password=root <<'SQL'
+CREATE DATABASE IF NOT EXISTS db_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER IF NOT EXISTS 'db_test'@'%' IDENTIFIED BY 'db_test';
+GRANT ALL PRIVILEGES ON db_test.* TO 'db_test'@'%';
+SQL
+
+if [ ! -f backend/.env.testing ]; then
+    cp backend/.env.testing.example backend/.env.testing
+    chmod 600 backend/.env.testing
+    ddev dotenv set backend/.env.testing --db-password=db_test
+    ddev php artisan key:generate --env=testing --no-interaction
+fi
