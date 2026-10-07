@@ -1,0 +1,19 @@
+# Local planning and assistant guidance
+/AGENTS.md
+/ROADMAP.md
+/docs/
+
+# Local environment files and dependencies
+.env
+.env.*
+!.env.example
+!.env.*.example
+**/vendor/
+**/node_modules/
+
+# Database exports and editor/OS files
+*.sql
+*.sql.gz
+.DS_Store
+.idea/
+.vscode/
