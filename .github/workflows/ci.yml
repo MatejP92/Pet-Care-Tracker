@@ -1,0 +1,105 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      APP_ENV: testing
+      APP_DEBUG: "false"
+      APP_URL: http://localhost
+      DB_HOST: 127.0.0.1
+      DB_PASSWORD: ci-test-password
+    services:
+      db:
+        image: mariadb:11.8
+        env:
+          MARIADB_ROOT_PASSWORD: ci-root-password
+          MARIADB_DATABASE: db_test
+          MARIADB_USER: db_test
+          MARIADB_PASSWORD: ci-test-password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+    steps:
+      - name: Check out code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up PHP and Composer
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
+        with:
+          php-version: "8.4"
+          extensions: mbstring, pdo_mysql, dom, xml
+          tools: composer:v2
+          coverage: none
+      - name: Validate Composer configuration
+        run: composer validate --strict
+      - name: Install locked dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+      - name: Check PHP platform requirements
+        run: composer check-platform-reqs
+      - name: Prepare test environment
+        run: |
+          cp .env.testing.example .env.testing
+          php artisan key:generate --env=testing --no-interaction
+      - name: Prepare database isolation check
+        env:
+          DB_CONTAINER: ${{ job.services.db.id }}
+        run: |
+          docker exec -i --env MYSQL_PWD=ci-root-password "$DB_CONTAINER" mariadb --user=root <<'SQL'
+          CREATE DATABASE db;
+          CREATE TABLE db.users (id BIGINT UNSIGNED PRIMARY KEY);
+          SQL
+      - name: Check PHP formatting
+        run: composer lint
+      - name: Run backend tests
+        run: composer test
+
+  frontend:
+    name: Frontend checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Check out code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Lint frontend
+        run: npm run lint
+      - name: Check TypeScript
+        run: npm run typecheck
+      - name: Build frontend
+        run: npm run build

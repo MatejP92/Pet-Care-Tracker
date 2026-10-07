@@ -97,6 +97,16 @@ Do not use DDEV's development or test credentials in a deployment.
 - `frontend/`: React status page and Vite/TypeScript configuration.
 - `.ddev/`: local development configuration, including phpMyAdmin.
 
+## Continuous integration
+
+The `CI` GitHub Actions workflow runs on pull requests targeting `main` and pushes to `main`. Its independent backend and frontend jobs run the same Composer and npm checks documented above, installing from the committed lockfiles.
+
+The backend job uses PHP 8.4, Composer 2, and a disposable MariaDB 11.8 service. Its `db_test` user can access only the test database; a separate empty `db.users` table lets the existing isolation test verify that access is denied. CI generates its own test application key and uses disposable database credentials, with no production secrets required.
+
+Tests default to DDEV's `db` hostname. CI overrides only `DB_HOST` to connect through the service's mapped localhost port; PHPUnit continues to enforce the test database, test username, and MariaDB connection. The frontend job uses Node.js 24 and runs lint, typecheck, and build. Both jobs use read-only repository permissions.
+
+View results in the pull request's checks or the repository's Actions tab. To make passing checks mandatory before merging, configure a branch ruleset requiring `Backend checks` and `Frontend checks`.
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for a short contribution guide. Use synthetic example data and keep credentials and real pet records out of the repository.
