@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+## Description: Run npm in the React frontend
+## Usage: frontend [npm arguments]
+## Example: "ddev frontend ci", "ddev frontend run dev", "ddev frontend run build"
+
+set -euo pipefail
+cd /var/www/html/frontend
+exec npm "$@"

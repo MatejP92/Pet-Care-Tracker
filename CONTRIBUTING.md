@@ -9,7 +9,7 @@ Small, focused improvements are welcome. For a substantial feature or architectu
 - Update setup instructions when your change affects them.
 - Use English for code identifiers and shared documentation.
 
-See [README.md](README.md) for local setup and backend test and lint commands. Include relevant behavioral tests when changing API or database behavior. Frontend checks will be documented when React is initialized.
+See [README.md](README.md) for local setup and backend test/lint and frontend lint/typecheck/build commands. Run the checks for the applications you change. Include relevant behavioral tests when changing API or database behavior.
 
 ## Data and security
 

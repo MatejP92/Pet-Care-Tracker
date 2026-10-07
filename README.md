@@ -4,12 +4,12 @@ A free, open-source application for keeping track of a pet's care and health his
 
 Planned features include recording meals, medication administration, symptoms, and measurements, and reviewing that history to support communication with a veterinarian. Core tracking and health-history features will remain free. The application will not diagnose conditions or recommend treatment or medication doses.
 
-**Status:** early development. The Laravel API foundation runs locally in DDEV. The React frontend and product features are not initialized yet.
+**Status:** early development. Laravel and React run locally in DDEV, with a status page that checks API connectivity. Product features are not implemented yet.
 
 ## Stack
 
 - Backend: Laravel 13 REST API, Sanctum, and MariaDB.
-- Frontend: React and TypeScript.
+- Frontend: React 19, TypeScript 6, and Vite 8.
 - Local development: DDEV with PHP 8.4, MariaDB 11.8, Composer 2, Node.js 24, and phpMyAdmin.
 
 ## Local development
@@ -24,12 +24,13 @@ ddev dotenv set backend/.env --db-password=db
 ddev php artisan key:generate
 ddev setup-test-db
 ddev php artisan migrate
+ddev frontend ci
 ddev describe
 ```
 
 These setup commands are for a fresh checkout. Keep existing environment files and application keys when returning to the project; use `ddev start` to resume development.
 
-The local application address is `https://pet-care-tracker.ddev.site`. Use `ddev describe` for the actual URLs and ports. The framework health route is `/up`; it checks application startup, not database readiness. `/api/user` returns a JSON `401` response until authentication is implemented and the client is authenticated.
+The local API address is `https://pet-care-tracker.ddev.site`. Use `ddev describe` for the actual URLs and ports. The framework health route is `/up`; it checks application startup. Public `GET /api/health` returns HTTP `200` and exactly `{"status":"ok"}`, with caching disabled. Neither health endpoint checks database readiness. `/api/user` returns a JSON `401` response until authentication is implemented and the client is authenticated.
 
 DDEV serves `backend/public` and runs shell and Composer commands in `backend/`.
 
@@ -47,6 +48,34 @@ DDEV's automatic framework settings management is disabled. Application settings
 
 The backend is served by DDEV; no backend Node build or separate PHP development server is required for these routes. User login and registration have not been implemented.
 
+## React development
+
+Start DDEV, then keep the frontend development server running in a terminal:
+
+```sh
+ddev frontend run dev
+```
+
+Open `https://pet-care-tracker.ddev.site:5173`. Stop Vite with Ctrl+C; use `ddev start` and the same command when resuming development. If adding the frontend configuration to an already running checkout, run `ddev restart` once to expose its port.
+
+`ddev frontend` runs npm in `frontend/`, using DDEV's Node.js 24 and npm 11. Dependencies are locked in `frontend/package-lock.json`; install them with `ddev frontend ci` after a fresh checkout or a lockfile change.
+
+The status page displays loading, connected, and failure states, with a retry action and a ten-second timeout. Requests use `/api/health`; Vite proxies `/api` to Laravel inside the web container. The browser uses the frontend origin, so this check needs no additional Laravel CORS configuration.
+
+`frontend/.env.example` documents the public `VITE_API_BASE_URL` build setting, which defaults to `/api`. Copy it to `frontend/.env.local` only to override that default. All `VITE_*` values are public in the browser; never place secrets there. A cross-origin API override needs an explicit backend CORS policy. Deployment routing and authentication settings are not configured by this development proxy.
+
+## Frontend checks
+
+Run from the repository root:
+
+```sh
+ddev frontend run lint
+ddev frontend run typecheck
+ddev frontend run build
+```
+
+The production build is written to the ignored `frontend/dist/` directory. Building does not deploy it or configure an API proxy; deployment must route `/api` to Laravel or provide a suitable public API base URL.
+
 ## Backend checks
 
 Run from the repository root:
@@ -60,12 +89,12 @@ ddev composer check-platform-reqs
 
 `ddev setup-test-db` creates the local `db_test` database, a user restricted to that database, and an ignored `backend/.env.testing` if it does not already exist. Its local username and password are both `db_test`. Tests use MariaDB and refuse to run application tests with a different database or user. They can reset the test database; keep it disposable.
 
-Do not use DDEV's development or test credentials in a deployment. Frontend check commands will be added when React is initialized.
+Do not use DDEV's development or test credentials in a deployment.
 
 ## Application directories
 
 - `backend/`: Laravel application, API routes, migrations, and tests.
-- `frontend/`: intended React application location; not created yet.
+- `frontend/`: React status page and Vite/TypeScript configuration.
 - `.ddev/`: local development configuration, including phpMyAdmin.
 
 ## Contributing
