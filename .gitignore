@@ -3,6 +3,9 @@
 /ROADMAP.md
 /docs/
 
+# Local browser verification artifacts
+/output/playwright/
+
 # Local environment files and dependencies
 .env
 .env.*
