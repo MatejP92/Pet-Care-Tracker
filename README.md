@@ -4,11 +4,11 @@ A free, open-source application for keeping track of a pet's care and health his
 
 Planned features include recording meals, medication administration, symptoms, and measurements, and reviewing that history to support communication with a veterinarian. Core tracking and health-history features will remain free. The application will not diagnose conditions or recommend treatment or medication doses.
 
-**Status:** early development. Laravel and React run locally in DDEV, with a status page that checks API connectivity. Product features are not implemented yet.
+**Status:** early development. Laravel and React run locally in DDEV, with Google sign-in and a status page that checks API connectivity. Pet tracking features are not implemented yet.
 
 ## Stack
 
-- Backend: Laravel 13 REST API, Sanctum, and MariaDB.
+- Backend: Laravel 13 REST API, Sanctum, Socialite, and MariaDB.
 - Frontend: React 19, TypeScript 6, and Vite 8.
 - Local development: DDEV with PHP 8.4, MariaDB 11.8, Composer 2, Node.js 24, and phpMyAdmin.
 
@@ -30,7 +30,7 @@ ddev describe
 
 These setup commands are for a fresh checkout. Keep existing environment files and application keys when returning to the project; use `ddev start` to resume development.
 
-The local API address is `https://pet-care-tracker.ddev.site`. Use `ddev describe` for the actual URLs and ports. The framework health route is `/up`; it checks application startup. Public `GET /api/health` returns HTTP `200` and exactly `{"status":"ok"}`, with caching disabled. Neither health endpoint checks database readiness. `/api/user` returns a JSON `401` response until authentication is implemented and the client is authenticated.
+The local API address is `https://pet-care-tracker.ddev.site`. Use `ddev describe` for the actual URLs and ports. The framework health route is `/up`; it checks application startup. Public `GET /api/health` returns HTTP `200` and exactly `{"status":"ok"}`, with caching disabled. Neither health endpoint checks database readiness. `GET /api/user` returns only the current user's ID, name, and email, with caching disabled, or a JSON `401` response when unauthenticated.
 
 DDEV serves `backend/public` and runs shell and Composer commands in `backend/`.
 
@@ -46,7 +46,7 @@ Inside the web container, MariaDB uses host `db`, port `3306`, and database, use
 
 DDEV's automatic framework settings management is disabled. Application settings belong in `backend/.env`. Real environment files are ignored by Git; the example files have empty application keys and database passwords.
 
-The backend is served by DDEV; no backend Node build or separate PHP development server is required for these routes. User login and registration have not been implemented.
+The backend is served by DDEV; no backend Node build or separate PHP development server is required for these routes.
 
 ## React development
 
@@ -62,7 +62,43 @@ Open `https://pet-care-tracker.ddev.site:5173`. Stop Vite with Ctrl+C; use `ddev
 
 The status page displays loading, connected, and failure states, with a retry action and a ten-second timeout. Requests use `/api/health`; Vite proxies `/api` to Laravel inside the web container. The browser uses the frontend origin, so this check needs no additional Laravel CORS configuration.
 
-`frontend/.env.example` documents the public `VITE_API_BASE_URL` build setting, which defaults to `/api`. Copy it to `frontend/.env.local` only to override that default. All `VITE_*` values are public in the browser; never place secrets there. A cross-origin API override needs an explicit backend CORS policy. Deployment routing and authentication settings are not configured by this development proxy.
+`frontend/.env.example` documents the public `VITE_API_BASE_URL` build setting for the health check, which defaults to `/api`. Copy it to `frontend/.env.local` only to override that default. All `VITE_*` values are public in the browser; never place secrets there. A cross-origin health API override needs an explicit backend CORS policy. Authentication always uses same-origin `/api`, `/auth`, and `/sanctum` paths. Deployment routing is not configured by this development proxy.
+
+## Local Google sign-in
+
+The frontend uses Laravel session cookies through Sanctum. Vite proxies `/api`, `/auth`, and `/sanctum` to Laravel, so browser API requests stay on the frontend origin and do not need an additional CORS allowance. Google's callback goes directly to the backend and redirects to the server-configured `FRONTEND_URL`. Cookies are shared across ports on the same hostname, are host-only, and use HTTPS with `SameSite=Lax`; the session cookie is `HttpOnly`. Logout uses a CSRF-protected POST with an `X-XSRF-TOKEN` header. No API bearer tokens are issued or stored in browser storage.
+
+To enable real Google sign-in:
+
+1. In [Google Auth Platform](https://console.cloud.google.com/auth/overview), create or choose a project, configure an External audience in Testing mode, and add the Google accounts that will test the app.
+2. Create an OAuth client of type **Web application**. Add this exact **Authorized redirect URI**: `https://pet-care-tracker.ddev.site/auth/google/callback`. The callback does not use port `5173`. This server-side flow does not need an authorized JavaScript origin.
+3. Add the client ID and client secret to the ignored `backend/.env`, alongside the local settings below. Keep credentials on the backend; never add them to a `VITE_*` variable or commit them.
+
+```dotenv
+FRONTEND_URL=https://pet-care-tracker.ddev.site:5173
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+GOOGLE_REDIRECT_URI=https://pet-care-tracker.ddev.site/auth/google/callback
+SESSION_DOMAIN=null
+SESSION_SECURE_COOKIE=true
+SESSION_SAME_SITE=lax
+SANCTUM_STATEFUL_DOMAINS=pet-care-tracker.ddev.site:5173,pet-care-tracker.ddev.site
+```
+
+4. Apply the migration and reload Laravel's configuration. Restart Vite if it was already running before the authentication proxy paths were added.
+
+```sh
+ddev composer install
+ddev php artisan migrate
+ddev php artisan config:clear
+ddev frontend run dev
+```
+
+Open `https://pet-care-tracker.ddev.site:5173`, select **Sign in with Google**, and confirm that your name and email appear after returning. Refresh to check session persistence, then select **Sign out** and confirm that the sign-in button returns. Cancelling Google sign-in shows a retry message. Without OAuth credentials, the app shows a generic sign-in-unavailable message; the public health check still works.
+
+First sign-in creates a passwordless local user using Google's stable subject ID. Subsequent sign-ins use that ID even if the email changes. Google must supply a verified email; matching emails never automatically link accounts. Only `openid`, `profile`, and `email` are requested, and Google access/refresh tokens are not persisted. Pet and household authorization are separate future work.
+
+Automated tests simulate Google's token and profile responses without using credentials or real accounts. They run against the isolated MariaDB test database and cover session authentication, identity conflicts, OAuth state validation/replay, cancellation, provider failures, and CSRF-protected logout. A real Google round trip still requires the OAuth client settings above.
 
 ## Frontend checks
 
@@ -74,7 +110,7 @@ ddev frontend run typecheck
 ddev frontend run build
 ```
 
-The production build is written to the ignored `frontend/dist/` directory. Building does not deploy it or configure an API proxy; deployment must route `/api` to Laravel or provide a suitable public API base URL.
+The production build is written to the ignored `frontend/dist/` directory. Building does not deploy it or configure a proxy. Session authentication requires same-origin routing of `/api`, `/auth`, and `/sanctum` to Laravel. `VITE_API_BASE_URL` overrides only the public health check.
 
 ## Backend checks
 
