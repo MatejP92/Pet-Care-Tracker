@@ -123,6 +123,16 @@ ddev composer validate --strict
 ddev composer check-platform-reqs
 ```
 
+`ddev composer lint` checks PHP formatting without changing files. To fix formatting, run `ddev exec vendor/bin/pint`, review the changes, and stage them again. Use Pint for PHP; other editor formatters may use different rules.
+
+To enable the optional PHP check before committing, run once per checkout from the repository root:
+
+```sh
+git config --local core.hooksPath .githooks
+```
+
+When a commit includes added, modified, copied, or renamed PHP files under `backend/`, the hook runs `ddev composer lint` against the backend working tree. DDEV must be running and Composer dependencies installed. A failed check stops the commit without modifying files. If you stage only part of a PHP file, check that staged version too; the hook checks the working tree. CI still checks the committed files.
+
 `ddev setup-test-db` creates the local `db_test` database, a user restricted to that database, and an ignored `backend/.env.testing` if it does not already exist. Its local username and password are both `db_test`. Tests use MariaDB and refuse to run application tests with a different database or user. They can reset the test database; keep it disposable.
 
 Do not use DDEV's development or test credentials in a deployment.
