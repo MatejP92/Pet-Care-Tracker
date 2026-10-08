@@ -1,0 +1,23 @@
+#!/bin/sh
+set -eu
+
+cd "$(git rev-parse --show-toplevel)"
+
+if git diff --cached --quiet --diff-filter=ACMR -- ':(glob)backend/**/*.php'; then
+    exit 0
+fi
+
+if ! command -v ddev >/dev/null 2>&1; then
+    printf '%s\n' 'PHP style check requires DDEV. Install DDEV and start the project before committing.' >&2
+    exit 1
+fi
+
+printf '%s\n' 'Checking PHP style with Laravel Pint...'
+
+if ! ddev composer lint; then
+    printf '%s\n' \
+        'Commit stopped: PHP style check failed.' \
+        'Ensure DDEV is running. Fix formatting with: ddev exec vendor/bin/pint' \
+        'Review and stage the fixes, then commit again.' >&2
+    exit 1
+fi

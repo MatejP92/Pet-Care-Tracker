@@ -20,6 +20,21 @@ class BackendFoundationTest extends TestCase
         $this->get('/up')->assertOk();
     }
 
+    public function test_the_public_health_check_stays_stateless_for_the_spa_without_database_access(): void
+    {
+        config([
+            'sanctum.stateful' => ['pet-care-tracker.ddev.site:5173'],
+            'session.driver' => 'database',
+            'database.connections.mariadb.host' => 'unavailable.invalid',
+        ]);
+
+        $this->withHeader('Origin', 'https://pet-care-tracker.ddev.site:5173')
+            ->getJson('/api/health')
+            ->assertOk()
+            ->assertExactJson(['status' => 'ok'])
+            ->assertCookieMissing(config('session.cookie'));
+    }
+
     public function test_the_api_requires_authentication_for_the_current_user(): void
     {
         $this->getJson('/api/user')
